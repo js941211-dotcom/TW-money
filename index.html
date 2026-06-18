@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>台股估值儀表板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#15202b;        /* primary text */
+    --ink-soft:#5a6b7b;   /* secondary text */
+    --paper:#f3f1ec;      /* page bg */
+    --panel:#ffffff;      /* card bg */
+    --line:#e2ddd2;       /* hairlines */
+    --line-strong:#cfc8b9;
+    --brand:#1f3a5f;      /* deep indigo chrome */
+    --low:#1d7a5e;        /* 低估 emerald */
+    --low-bg:#e3f3ec;
+    --high:#b23a48;       /* 高估 rose */
+    --high-bg:#f7e6e8;
+    --mid:#8a8576;        /* 中性 */
+    --mid-bg:#ece8df;
+    --na:#b9b3a6;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Noto Sans TC",system-ui,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px;}
+
+  /* ---------- Masthead ---------- */
+  header.top{background:var(--brand);color:#fff;border-bottom:3px solid #122842;}
+  .top-inner{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;padding:22px 18px 18px;max-width:1180px;margin:0 auto;}
+  .brandmark{display:flex;flex-direction:column;gap:2px;}
+  .eyebrow{font-family:"Space Grotesk",sans-serif;font-weight:600;letter-spacing:.22em;text-transform:uppercase;font-size:11px;color:#a9c2e0;}
+  h1{margin:0;font-family:"Space Grotesk","Noto Sans TC",sans-serif;font-weight:700;font-size:clamp(24px,5vw,34px);letter-spacing:.01em;}
+  .meta{margin-left:auto;text-align:right;font-size:12.5px;color:#cdd9e8;line-height:1.7;}
+  .meta b{color:#fff;font-weight:600;}
+  .demo-flag{display:inline-block;margin-top:4px;background:#f4c95d;color:#3a2c00;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;}
+
+  /* ---------- Market strip ---------- */
+  .market{background:#13243a;color:#dbe6f4;}
+  .market-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#26405f;max-width:1180px;margin:0 auto;}
+  .mstat{background:#13243a;padding:13px 16px;}
+  .mstat .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#7f9bc0;font-family:"Space Grotesk",sans-serif;font-weight:600;}
+  .mstat .v{font-size:22px;font-weight:600;margin-top:3px;}
+  .mstat .v small{font-size:12px;color:#9db4d4;font-weight:500;}
+
+  /* ---------- Controls ---------- */
+  .controls{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line);padding:14px 0 12px;}
+  .controls-inner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .search{flex:1 1 220px;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line-strong);border-radius:999px;padding:9px 15px;}
+  .search input{border:0;outline:0;background:transparent;font:inherit;width:100%;color:var(--ink);}
+  .search svg{flex:none;}
+  .chips{display:flex;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;scrollbar-width:thin;}
+  .chip{flex:none;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-soft);font:inherit;font-size:13px;padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s;}
+  .chip:hover{border-color:var(--brand);}
+  .chip[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .chip:focus-visible,.search:focus-within,button:focus-visible,th[role="button"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px;}
+
+  /* ---------- Section heading ---------- */
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin:26px 0 10px;flex-wrap:wrap;}
+  .sec-head h2{margin:0;font-family:"Space Grotesk","Noto Sans TC",sans-serif;font-size:19px;font-weight:700;}
+  .sec-head .count{font-size:12.5px;color:var(--ink-soft);}
+  .ind-avg{margin-left:auto;display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);}
+  .ind-avg span b{color:var(--ink);font-weight:600;}
+
+  /* ---------- Table ---------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{border-collapse:collapse;width:100%;min-width:760px;}
+  thead th{font-size:11.5px;letter-spacing:.04em;color:var(--ink-soft);font-weight:600;text-align:right;padding:11px 12px;background:#faf8f3;border-bottom:1px solid var(--line-strong);position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap;}
+  thead th.l{text-align:left;}
+  thead th .sort{display:inline-block;width:9px;color:var(--na);}
+  thead th[aria-sort="ascending"] .sort::after{content:"▲";color:var(--brand);}
+  thead th[aria-sort="descending"] .sort::after{content:"▼";color:var(--brand);}
+  tbody td{padding:11px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover td{background:#fbfaf6;}
+  .nm{text-align:left;}
+  .nm .code{font-size:12px;color:var(--ink-soft);}
+  .nm .name{font-weight:500;}
+  .price{font-weight:600;}
+
+  /* metric cell */
+  .cell{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;}
+  .cell .num{font-weight:600;}
+  .tag{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.02em;}
+  .tag.low{color:var(--low);background:var(--low-bg);}
+  .tag.high{color:var(--high);background:var(--high-bg);}
+  .tag.mid{color:var(--mid);background:var(--mid-bg);}
+  .tag.na{color:var(--na);background:transparent;}
+
+  /* signature: valuation spectrum */
+  .spectrum{display:inline-flex;gap:2px;}
+  .spectrum i{width:13px;height:7px;border-radius:2px;background:var(--mid-bg);display:inline-block;}
+  .spectrum i.low{background:var(--low);}
+  .spectrum i.high{background:var(--high);}
+  .spectrum i.mid{background:var(--line-strong);}
+  .spectrum i.na{background:transparent;border:1px dashed var(--line-strong);}
+  .verdict{display:inline-flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  .verdict .lab{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;}
+  .verdict .lab.low{color:var(--low);background:var(--low-bg);}
+  .verdict .lab.high{color:var(--high);background:var(--high-bg);}
+  .verdict .lab.mid{color:var(--mid);background:var(--mid-bg);}
+
+  /* ---------- Legend ---------- */
+  .legend{margin:30px 0 50px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;}
+  .legend h3{margin:0 0 10px;font-family:"Space Grotesk","Noto Sans TC",sans-serif;font-size:15px;}
+  .legend ul{margin:0;padding-left:18px;font-size:13px;color:var(--ink-soft);line-height:1.8;}
+  .legend b{color:var(--ink);}
+  .legkeys{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px;font-size:12.5px;}
+  .legkeys span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+  .empty{padding:40px 16px;text-align:center;color:var(--ink-soft);}
+  footer{padding:24px 0 40px;color:var(--ink-soft);font-size:12px;text-align:center;}
+  footer a{color:var(--brand);}
+
+  @media (max-width:560px){
+    .market-inner{grid-template-columns:repeat(2,1fr);}
+    .meta{margin-left:0;text-align:left;width:100%;}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brandmark">
+      <span class="eyebrow">本益比 · 淨值比 · 殖利率 · 營收比</span>
+      <h1>台股估值儀表板</h1>
+    </div>
+    <div class="meta">
+      資料來源 <b>臺灣證券交易所 OpenAPI</b><br/>
+      最後更新 <b id="updated">—</b><br/>
+      <span id="srcflag"></span>
+    </div>
+  </div>
+</header>
+
+<div class="market">
+  <div class="market-inner" id="market"></div>
+</div>
+
+<div class="controls">
+  <div class="wrap controls-inner">
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8576" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="搜尋代號或名稱…" autocomplete="off" />
+    </label>
+    <div class="chips" id="chips"></div>
+  </div>
+</div>
+
+<main class="wrap" id="board"></main>
+
+<div class="wrap">
+  <section class="legend">
+    <h3>怎麼看這張表</h3>
+    <div class="legkeys">
+      <span><i class="dot" style="background:var(--low)"></i> 偏低估(相對同業便宜)</span>
+      <span><i class="dot" style="background:var(--high)"></i> 偏高估(相對同業偏貴)</span>
+      <span><i class="dot" style="background:var(--line-strong)"></i> 中性(接近同業均值)</span>
+      <span><i class="dot" style="border:1px dashed var(--line-strong);background:transparent"></i> 無資料/不適用</span>
+    </div>
+    <ul>
+      <li>每檔股票的四個指標都跟<b>「同產業平均」</b>比較,落在均值上下 10% 內視為中性。</li>
+      <li><b>本益比、股價淨值比、股價營收比</b>:低於同業 → 偏低估;高於同業 → 偏高估。</li>
+      <li><b>現金殖利率相反</b>:高於同業 → 偏低估(便宜);低於同業 → 偏高估(貴)。不配息者標為不適用。</li>
+      <li><b>估值光譜</b>(四個小方塊)依序代表 P/E、P/B、殖利率、P/S,綠多代表多數指標偏便宜。</li>
+      <li><b>總評</b>把四個訊號加總:每個偏低估 +1、偏高估 −1,≥+2 為偏低估、≤−2 為偏高估。</li>
+      <li>這是篩選與比較的<b>參考工具</b>,不是買賣建議。產業循環、一次性損益、虧損股(本益比為負)都會影響判讀。</li>
+    </ul>
+  </section>
+</div>
+
+<footer class="wrap">
+  每週自動更新 · 資料僅供研究參考,不構成投資建議 · 估值判斷以同產業平均為基準
+</footer>
+
+<script>
+/* ============================================================
+   範例資料 — 部署後會自動讀取同目錄的 ./data.json 取代以下內容
+   schema: { updated, market, stocks:[{code,name,industry,price,pe,pb,yield,ps}] }
+   數值為示意，非真實報價
+   ============================================================ */
+const SAMPLE_DATA = {
+  updated: "範例資料",
+  market: "TWSE",
+  sample: true,
+  stocks: [
+    {code:"2330",name:"台積電",industry:"半導體業",price:1085,pe:27,pb:7.0,yield:1.4,ps:13.0},
+    {code:"2454",name:"聯發科",industry:"半導體業",price:1300,pe:22,pb:4.5,yield:4.0,ps:5.0},
+    {code:"2303",name:"聯電",industry:"半導體業",price:48,pe:14,pb:1.8,yield:5.5,ps:2.5},
+    {code:"3034",name:"聯詠",industry:"半導體業",price:520,pe:16,pb:4.0,yield:6.0,ps:3.2},
+    {code:"2379",name:"瑞昱",industry:"半導體業",price:560,pe:20,pb:3.5,yield:3.0,ps:2.8},
+    {code:"2881",name:"富邦金",industry:"金融保險業",price:95,pe:11,pb:1.2,yield:5.0,ps:1.5},
+    {code:"2882",name:"國泰金",industry:"金融保險業",price:68,pe:10,pb:1.1,yield:5.5,ps:1.2},
+    {code:"2891",name:"中信金",industry:"金融保險業",price:40,pe:12,pb:1.3,yield:4.5,ps:1.4},
+    {code:"2886",name:"兆豐金",industry:"金融保險業",price:42,pe:14,pb:1.6,yield:4.0,ps:2.0},
+    {code:"2884",name:"玉山金",industry:"金融保險業",price:28,pe:13,pb:1.5,yield:4.8,ps:1.8},
+    {code:"2317",name:"鴻海",industry:"電腦及週邊設備業",price:210,pe:14,pb:1.6,yield:3.8,ps:0.4},
+    {code:"2382",name:"廣達",industry:"電腦及週邊設備業",price:320,pe:18,pb:5.0,yield:3.5,ps:0.5},
+    {code:"2357",name:"華碩",industry:"電腦及週邊設備業",price:620,pe:13,pb:1.8,yield:4.0,ps:0.7},
+    {code:"2376",name:"技嘉",industry:"電腦及週邊設備業",price:280,pe:12,pb:2.5,yield:3.0,ps:0.6},
+    {code:"2412",name:"中華電",industry:"通信網路業",price:128,pe:26,pb:2.4,yield:4.2,ps:4.5},
+    {code:"3045",name:"台灣大",industry:"通信網路業",price:110,pe:24,pb:3.0,yield:4.5,ps:2.0},
+    {code:"4904",name:"遠傳",industry:"通信網路業",price:95,pe:25,pb:2.8,yield:4.3,ps:2.2},
+    {code:"1301",name:"台塑",industry:"塑膠工業",price:48,pe:35,pb:1.0,yield:2.0,ps:0.8},
+    {code:"1303",name:"南亞",industry:"塑膠工業",price:45,pe:40,pb:0.9,yield:1.8,ps:1.0},
+    {code:"1326",name:"台化",industry:"塑膠工業",price:40,pe:30,pb:0.8,yield:2.2,ps:0.9},
+    {code:"2002",name:"中鋼",industry:"鋼鐵工業",price:22,pe:25,pb:0.9,yield:1.5,ps:0.7},
+    {code:"2027",name:"大成鋼",industry:"鋼鐵工業",price:38,pe:12,pb:1.2,yield:4.0,ps:0.5},
+    {code:"1216",name:"統一",industry:"食品工業",price:78,pe:20,pb:2.2,yield:3.5,ps:0.9},
+    {code:"1227",name:"佳格",industry:"食品工業",price:70,pe:18,pb:2.0,yield:3.0,ps:1.1},
+    {code:"2603",name:"長榮",industry:"航運業",price:200,pe:5,pb:1.1,yield:8.0,ps:1.0},
+    {code:"2609",name:"陽明",industry:"航運業",price:65,pe:6,pb:0.9,yield:7.0,ps:1.2},
+    {code:"2615",name:"萬海",industry:"航運業",price:90,pe:7,pb:1.0,yield:6.0,ps:1.3}
+  ]
+};
+
+/* metric config: lowerIsCheaper=true means a lower value -> 低估 */
+const METRICS = [
+  {key:"pe",    label:"本益比 P/E",  lowerCheaper:true,  fmt:v=>v.toFixed(1)},
+  {key:"pb",    label:"淨值比 P/B",  lowerCheaper:true,  fmt:v=>v.toFixed(2)},
+  {key:"yield", label:"殖利率 %",    lowerCheaper:false, fmt:v=>v.toFixed(2)},
+  {key:"ps",    label:"營收比 P/S",  lowerCheaper:true,  fmt:v=>v.toFixed(2)}
+];
+const BAND = 0.10;
+
+const valid = v => typeof v === "number" && isFinite(v) && v > 0;
+
+function industryAverages(stocks){
+  const byInd = {};
+  stocks.forEach(s=>{ (byInd[s.industry] ||= []).push(s); });
+  const avg = {};
+  for(const ind in byInd){
+    avg[ind] = {};
+    METRICS.forEach(m=>{
+      const vals = byInd[ind].map(s=>s[m.key]).filter(valid);
+      avg[ind][m.key] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+  }
+  return {byInd, avg};
+}
+function marketAverages(stocks){
+  const out = {};
+  METRICS.forEach(m=>{
+    const vals = stocks.map(s=>s[m.key]).filter(valid);
+    out[m.key] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  });
+  return out;
+}
+/* signal: 'low' | 'high' | 'mid' | 'na' */
+function signal(value, avg, lowerCheaper){
+  if(!valid(value) || !valid(avg)) return "na";
+  const hi = avg*(1+BAND), lo = avg*(1-BAND);
+  if(lowerCheaper){
+    if(value < lo) return "low";
+    if(value > hi) return "high";
+  } else {
+    if(value > hi) return "low";
+    if(value < lo) return "high";
+  }
+  return "mid";
+}
+function scoreOf(s, avg){
+  let sc = 0, n = 0;
+  METRICS.forEach(m=>{
+    const sig = signal(s[m.key], avg[m.key], m.lowerCheaper);
+    if(sig==="low"){sc++; n++;} else if(sig==="high"){sc--; n++;} else if(sig==="mid"){n++;}
+  });
+  return {sc, n};
+}
+
+/* ---------- state ---------- */
+let DATA = SAMPLE_DATA;
+let activeInd = "全部";
+let query = "";
+let sortKey = "score";      // default sort by valuation score
+let sortDir = "desc";
+
+const $ = sel => document.querySelector(sel);
+const fmtNum = (v, d=2) => valid(v) ? v.toFixed(d) : "—";
+
+function render(){
+  const stocks = DATA.stocks;
+  const {avg} = industryAverages(stocks);
+  const mkt = marketAverages(stocks);
+  const industries = [...new Set(stocks.map(s=>s.industry))].sort();
+
+  // header
+  $("#updated").textContent = DATA.updated || "—";
+  $("#srcflag").innerHTML = DATA.sample
+    ? '<span class="demo-flag">範例資料</span>'
+    : '<span style="color:#bcd2ef">即時資料</span>';
+
+  // market strip
+  $("#market").innerHTML = METRICS.map(m=>`
+    <div class="mstat">
+      <div class="k">大盤 ${m.label}</div>
+      <div class="v mono">${fmtNum(mkt[m.key], m.key==="pe"?1:2)}<small> 平均</small></div>
+    </div>`).join("");
+
+  // chips
+  const chips = ["全部", ...industries];
+  $("#chips").innerHTML = chips.map(c=>`
+    <button class="chip" data-ind="${c}" aria-pressed="${c===activeInd}">${c}</button>`).join("");
+  $("#chips").querySelectorAll(".chip").forEach(b=>{
+    b.onclick = ()=>{ activeInd = b.dataset.ind; render(); };
+  });
+
+  // which industries to show
+  const showInds = activeInd==="全部" ? industries : [activeInd];
+  const board = $("#board");
+  board.innerHTML = "";
+
+  let shown = 0;
+  showInds.forEach(ind=>{
+    let rows = stocks.filter(s=>s.industry===ind);
+    if(query){
+      const q = query.toLowerCase();
+      rows = rows.filter(s=> s.code.includes(q) || s.name.toLowerCase().includes(q));
+    }
+    if(!rows.length) return;
+    shown += rows.length;
+
+    const a = avg[ind];
+    // sort rows
+    rows = rows.slice().sort((x,y)=>{
+      let vx, vy;
+      if(sortKey==="score"){ vx = scoreOf(x,a).sc; vy = scoreOf(y,a).sc; }
+      else if(sortKey==="name"){ vx = x.code; vy = y.code; }
+      else { vx = x[sortKey] ?? -Infinity; vy = y[sortKey] ?? -Infinity; }
+      if(vx<vy) return sortDir==="asc"?-1:1;
+      if(vx>vy) return sortDir==="asc"?1:-1;
+      return 0;
+    });
+
+    const sec = document.createElement("section");
+    const avgStrip = METRICS.map(m=>`<span>${m.label.split(" ")[0]} <b>${fmtNum(a[m.key], m.key==="pe"?1:2)}</b></span>`).join("");
+    sec.innerHTML = `
+      <div class="sec-head">
+        <h2>${ind}</h2><span class="count">${rows.length} 檔</span>
+        <div class="ind-avg"><span style="color:var(--ink-soft)">產業均值：</span>${avgStrip}</div>
+      </div>
+      <div class="panel"><div class="scroll"><table>
+        <thead><tr>
+          <th class="l" role="button" tabindex="0" data-k="name" ${ariaSort("name")}>個股<span class="sort"></span></th>
+          <th role="button" tabindex="0" data-k="price" ${ariaSort("price")}>現價<span class="sort"></span></th>
+          ${METRICS.map(m=>`<th role="button" tabindex="0" data-k="${m.key}" ${ariaSort(m.key)}>${m.label}<span class="sort"></span></th>`).join("")}
+          <th role="button" tabindex="0" data-k="score" ${ariaSort("score")}>估值光譜 · 總評<span class="sort"></span></th>
+        </tr></thead>
+        <tbody>${rows.map(s=>rowHtml(s,a)).join("")}</tbody>
+      </table></div></div>`;
+    board.appendChild(sec);
+  });
+
+  if(shown===0){
+    board.innerHTML = `<div class="panel"><div class="empty">找不到符合「${query}」的個股,試試其他關鍵字或切換產業。</div></div>`;
+  }
+
+  // header sort handlers
+  board.querySelectorAll("th[role=button]").forEach(th=>{
+    const go = ()=>{
+      const k = th.dataset.k;
+      if(sortKey===k){ sortDir = sortDir==="asc"?"desc":"asc"; }
+      else { sortKey = k; sortDir = (k==="name")?"asc":"desc"; }
+      render();
+    };
+    th.onclick = go;
+    th.onkeydown = e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+  });
+}
+
+function ariaSort(k){ return sortKey===k ? `aria-sort="${sortDir==="asc"?"ascending":"descending"}"` : ""; }
+
+function metricCell(s, m, a){
+  const v = s[m.key];
+  const sig = signal(v, a[m.key], m.lowerCheaper);
+  const tagText = {low:"低估",high:"高估",mid:"中性",na:"—"}[sig];
+  return `<td><span class="cell">
+      <span class="num mono">${valid(v)?m.fmt(v):"—"}</span>
+      <span class="tag ${sig}">${tagText}</span>
+    </span></td>`;
+}
+function rowHtml(s, a){
+  const {sc} = scoreOf(s, a);
+  const spectrum = METRICS.map(m=>`<i class="${signal(s[m.key],a[m.key],m.lowerCheaper)}"></i>`).join("");
+  const cls = sc>=2 ? "low" : sc<=-2 ? "high" : "mid";
+  const lab = sc>=2 ? "偏低估" : sc<=-2 ? "偏高估" : "中性";
+  const sign = sc>0?`+${sc}`:`${sc}`;
+  return `<tr>
+    <td class="nm"><div class="name">${s.name}</div><div class="code mono">${s.code}</div></td>
+    <td class="price mono">${fmtNum(s.price, s.price>=100?1:2)}</td>
+    ${METRICS.map(m=>metricCell(s,m,a)).join("")}
+    <td><span class="verdict">
+      <span class="spectrum">${spectrum}</span>
+      <span class="lab ${cls}">${lab} ${sign}</span>
+    </span></td>
+  </tr>`;
+}
+
+/* search */
+$("#q").addEventListener("input", e=>{ query = e.target.value.trim(); render(); });
+
+/* try to load real data.json next to this file; fall back to sample */
+(async ()=>{
+  try{
+    const res = await fetch("./data.json", {cache:"no-store"});
+    if(res.ok){
+      const json = await res.json();
+      if(json && Array.isArray(json.stocks) && json.stocks.length){
+        DATA = json;
+      }
+    }
+  }catch(e){ /* keep sample */ }
+  render();
+})();
+</script>
+</body>
+</html>
