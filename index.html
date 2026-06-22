@@ -168,11 +168,11 @@
     <div class="legkeys">
       <span><i class="dot" style="background:var(--low)"></i> 偏低估(相對同業便宜)</span>
       <span><i class="dot" style="background:var(--high)"></i> 偏高估(相對同業偏貴)</span>
-      <span><i class="dot" style="background:var(--line-strong)"></i> 中性(接近同業均值)</span>
+      <span><i class="dot" style="background:var(--line-strong)"></i> 中性(接近同業中位數)</span>
       <span><i class="dot" style="border:1px dashed var(--line-strong);background:transparent"></i> 無資料/不適用</span>
     </div>
     <ul>
-      <li>每檔股票的四個指標都跟<b>「同產業平均」</b>比較,落在均值上下 10% 內視為中性。</li>
+      <li>每檔股票的四個指標都跟<b>「同產業中位數」</b>比較(已自動排除極端值),落在中位數上下 10% 內視為中性。</li>
       <li><b>本益比、股價淨值比、股價營收比</b>:低於同業 → 偏低估;高於同業 → 偏高估。</li>
       <li><b>現金殖利率相反</b>:高於同業 → 偏低估(便宜);低於同業 → 偏高估(貴)。不配息者標為不適用。</li>
       <li><b>估值光譜</b>(四個小方塊)依序代表 P/E、P/B、殖利率、P/S,綠多代表多數指標偏便宜。</li>
@@ -183,7 +183,7 @@
 </div>
 
 <footer class="wrap">
-  每週自動更新 · 資料僅供研究參考,不構成投資建議 · 估值判斷以同產業平均為基準
+  每週自動更新 · 資料僅供研究參考,不構成投資建議 · 估值判斷以同產業中位數為基準
 </footer>
 
 <script>
@@ -238,6 +238,19 @@ const BAND = 0.10;
 
 const valid = v => typeof v === "number" && isFinite(v) && v > 0;
 
+/* 用「中位數」當基準,並在樣本夠多時去頭去尾各 10% 的極端值,
+   避免少數本益比破百的個股把基準拉爆,讓低估/高估訊號失真。 */
+function robustCenter(values){
+  const v = values.filter(valid).sort((a,b)=>a-b);
+  if(!v.length) return null;
+  let arr = v;
+  if(v.length >= 8){
+    const k = Math.floor(v.length * 0.1);
+    arr = v.slice(k, v.length - k);
+  }
+  const n = arr.length, mid = Math.floor(n/2);
+  return n % 2 ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
+}
 function industryAverages(stocks){
   const byInd = {};
   stocks.forEach(s=>{ (byInd[s.industry] ||= []).push(s); });
@@ -245,8 +258,7 @@ function industryAverages(stocks){
   for(const ind in byInd){
     avg[ind] = {};
     METRICS.forEach(m=>{
-      const vals = byInd[ind].map(s=>s[m.key]).filter(valid);
-      avg[ind][m.key] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+      avg[ind][m.key] = robustCenter(byInd[ind].map(s=>s[m.key]));
     });
   }
   return {byInd, avg};
@@ -254,8 +266,7 @@ function industryAverages(stocks){
 function marketAverages(stocks){
   const out = {};
   METRICS.forEach(m=>{
-    const vals = stocks.map(s=>s[m.key]).filter(valid);
-    out[m.key] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    out[m.key] = robustCenter(stocks.map(s=>s[m.key]));
   });
   return out;
 }
@@ -301,13 +312,13 @@ function render(){
   $("#updated").textContent = DATA.updated || "—";
   $("#srcflag").innerHTML = DATA.sample
     ? '<span class="demo-flag">範例資料</span>'
-    : '<span style="color:#bcd2ef">即時資料</span>';
+    : '<span style="color:#bcd2ef">每日收盤資料</span>';
 
   // market strip
   $("#market").innerHTML = METRICS.map(m=>`
     <div class="mstat">
       <div class="k">大盤 ${m.label}</div>
-      <div class="v mono">${fmtNum(mkt[m.key], m.key==="pe"?1:2)}<small> 平均</small></div>
+      <div class="v mono">${fmtNum(mkt[m.key], m.key==="pe"?1:2)}<small> 中位數</small></div>
     </div>`).join("");
 
   // chips
@@ -350,7 +361,7 @@ function render(){
     sec.innerHTML = `
       <div class="sec-head">
         <h2>${ind}</h2><span class="count">${rows.length} 檔</span>
-        <div class="ind-avg"><span style="color:var(--ink-soft)">產業均值：</span>${avgStrip}</div>
+        <div class="ind-avg"><span style="color:var(--ink-soft)">產業中位數：</span>${avgStrip}</div>
       </div>
       <div class="panel"><div class="scroll"><table>
         <thead><tr>
