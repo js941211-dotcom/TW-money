@@ -148,7 +148,7 @@ def build(out_path, hist_path):
         if not code:
             continue
         code = str(code).strip()
-        rev = num(get(r, "當月營收"))
+        rev = num(get(r, "營業收入-當月營收", "當月營收"))
         if rev is not None:
             this_month_rev[code] = rev          # 單位:千元
         if period is None:
@@ -199,6 +199,13 @@ def build(out_path, hist_path):
         comp = comp_by.get(code, {})
         industry = normalize_industry(get(comp, "產業別"))
         shares = num(get(comp, "已發行普通股數或TDR原股發行股數", "已發行普通股數"))
+        if not shares:
+            cap = num(get(comp, "實收資本額(元)", "實收資本額"))
+            fv_raw = str(get(comp, "普通股每股面額") or "10").replace(",", "")
+            fv = re.search(r"(\d+(?:\.\d+)?)", fv_raw)
+            face = float(fv.group(1)) if fv and float(fv.group(1)) > 0 else 10.0
+            if cap:
+                shares = cap / face
 
         ps = None
         ps_approx = False
